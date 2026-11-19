@@ -10,6 +10,7 @@ import {
   Loader2,
   MapPin,
   MessageCircle,
+  Phone,
   Recycle,
   Scale,
   ShieldCheck,
@@ -17,10 +18,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import {
-  claimOrReserveItem,
-  markItemAsDistributed,
-} from "@/app/actions";
+import { bookItem, markAsSold } from "@/app/actions";
 import { PublicItem } from "@/lib/types";
 import {
   formatRupiah,
@@ -39,7 +37,7 @@ export default function ItemDetailModal({
   onSuccess,
 }: ItemDetailModalProps) {
   const [buyerName, setBuyerName] = useState("");
-  const [pickupPlan, setPickupPlan] = useState("");
+  const [buyerWa, setBuyerWa] = useState("");
   const [sellerPin, setSellerPin] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -47,7 +45,7 @@ export default function ItemDetailModal({
 
   useEffect(() => {
     setBuyerName("");
-    setPickupPlan("");
+    setBuyerWa("");
     setSellerPin("");
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -62,55 +60,48 @@ export default function ItemDetailModal({
   }, [onClose]);
 
   const isFree = item.price === 0;
-  const whatsappClean = item.whatsapp.replace(/\D/g, "");
+  const whatsappClean = item.seller_wa.replace(/\D/g, "");
   const whatsappText = encodeURIComponent(
     `Halo ${item.seller_name}, saya tertarik dengan barang "${item.title}" di GanesaStreet (${item.location}). Apakah masih tersedia?`
   );
   const whatsappUrl = `https://wa.me/${whatsappClean}?text=${whatsappText}`;
 
-  const handleClaim = async (e: React.FormEvent) => {
+  const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsSubmitting(true);
 
     try {
-      const res = await claimOrReserveItem({
-        itemId: item.id,
-        buyerName,
-        pickupPlan,
-      });
+      const res = await bookItem(item.id, buyerName, buyerWa);
 
       if (!res.success) {
-        setErrorMsg(res.message);
+        setErrorMsg(res.error ?? "Gagal memproses pengambilan barang.");
         return;
       }
 
-      setSuccessMsg(res.message);
+      setSuccessMsg(res.message ?? "Booking berhasil!");
       await onSuccess();
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleMarkDistributed = async (e: React.FormEvent) => {
+  const handleMarkSold = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsSubmitting(true);
 
     try {
-      const res = await markItemAsDistributed({
-        itemId: item.id,
-        pin: sellerPin,
-      });
+      const res = await markAsSold(item.id, sellerPin);
 
       if (!res.success) {
-        setErrorMsg(res.message);
+        setErrorMsg(res.error ?? "PIN tidak valid.");
         return;
       }
 
-      setSuccessMsg(res.message);
+      setSuccessMsg(res.message ?? "Barang berhasil ditandai Sudah Tersalurkan!");
       setSellerPin("");
       await onSuccess();
     } finally {
@@ -221,4 +212,164 @@ export default function ItemDetailModal({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text
+                  <p className="text-xs text-slate-500">
+                    Koordinasi titik temu COD via WhatsApp
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>Chat WhatsApp</span>
+              </a>
+            </div>
+
+            {errorMsg && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+                {errorMsg}
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-800">
+                {successMsg}
+              </div>
+            )}
+
+            {item.status === "Tersedia" && (
+              <form
+                onSubmit={handleBook}
+                className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4"
+              >
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <CalendarClock className="h-4 w-4 text-emerald-600" />
+                  <span>
+                    {isFree ? "Klaim Barang Giveaway Ini" : "Booking Barang Ini"}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Nama Penerima / Peminat
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    placeholder="Contoh: Naufal (STEI-K '26)"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Nomor WhatsApp Penerima
+                  </label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="tel"
+                      required
+                      value={buyerWa}
+                      onChange={(e) => setBuyerWa(e.target.value)}
+                      placeholder="Contoh: 081234567890"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  <span>Konfirmasi Booking</span>
+                </button>
+              </form>
+            )}
+
+            {item.status === "Dalam Proses" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+                  <p className="font-bold">Sedang dalam proses serah terima</p>
+                  {item.buyer_name && (
+                    <p className="mt-1">
+                      Penerima:{" "}
+                      <span className="font-semibold">{item.buyer_name}</span>
+                    </p>
+                  )}
+                  {item.buyer_wa && (
+                    <p className="mt-0.5">
+                      WhatsApp Penerima:{" "}
+                      <span className="font-semibold">+{item.buyer_wa}</span>
+                    </p>
+                  )}
+                </div>
+
+                <form
+                  onSubmit={handleMarkSold}
+                  className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <KeyRound className="h-4 w-4 text-emerald-600" />
+                    <span>Konfirmasi Barang Sudah Tersalurkan (Khusus Pemilik)</span>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Masukkan 4 digit PIN yang kamu buat saat mengunggah barang ini untuk mencatat massa reuse ke metrik SDG 12.5.
+                  </p>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      required
+                      maxLength={4}
+                      value={sellerPin}
+                      onChange={(e) => setSellerPin(e.target.value)}
+                      placeholder="4 digit PIN"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-4 w-4" />
+                      )}
+                      <span>Selesaikan</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {item.status === "Sudah Tersalurkan" && (
+              <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                <div>
+                  <p className="font-bold">Barang ini sudah berhasil disalurkan!</p>
+                  <p className="mt-0.5 text-emerald-800">
+                    Sebesar {item.estimated_weight_kg} kg potensi sampah berhasil dicegah melalui ekonomi sirkular kampus.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
