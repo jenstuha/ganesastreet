@@ -223,7 +223,7 @@ export async function getItemsAndMetrics(): Promise<ItemsAndMetricsResponse> {
     ORDER BY created_at DESC, id DESC
   `;
 
-  const items: PublicItem[] = rows.map((row) => ({
+  const items: PublicItem[] = rows.map((row: Record<string, unknown>) => ({
     id: Number(row.id),
     title: String(row.title),
     description: row.description ? String(row.description) : null,
